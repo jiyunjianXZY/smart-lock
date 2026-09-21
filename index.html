@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>智能门锁</title>
+  <meta name="theme-color" content="#1565C0" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="智能门锁" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <script src="config.js"></script>
+<style>
+  :root {
+    --primary: #1565C0;
+    --primary-dark: #0D47A1;
+    --open: #E53935;
+    --closed: #43A047;
+    --bg1: #eef4fb;
+    --bg2: #f7fafd;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --card: #ffffff;
+    --shadow: 0 12px 30px rgba(21, 101, 192, 0.12);
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--text);
+    background: linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 55%, #ffffff 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  header h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  .conn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 999px;
+    padding: 5px 10px;
+  }
+
+  .conn .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #9ca3af;
+    transition: background 0.2s ease;
+  }
+  .conn.ok .dot { background: var(--closed); }
+  .conn.err .dot { background: var(--open); }
+
+  .card {
+    background: var(--card);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    padding: 28px 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .lock-icon {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 42px;
+    margin-bottom: 16px;
+    transition: background 0.35s ease, box-shadow 0.35s ease;
+  }
+  .lock-icon.open {
+    background: rgba(229, 57, 53, 0.12);
+    box-shadow: 0 0 0 10px rgba(229, 57, 53, 0.06);
+  }
+  .lock-icon.closed {
+    background: rgba(67, 160, 71, 0.12);
+    box-shadow: 0 0 0 10px rgba(67, 160, 71, 0.06);
+  }
+  .lock-icon.loading {
+    background: rgba(107, 114, 128, 0.10);
+  }
+
+  .status-label {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .status-value {
+    font-size: 30px;
+    font-weight: 800;
+    transition: color 0.25s ease;
+  }
+  .status-value.open { color: var(--open); }
+  .status-value.closed { color: var(--closed); }
+
+  .rssi {
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .updated {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #9ca3af;
+  }
+
+  .actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .btn {
+    border: none;
+    border-radius: 14px;
+    padding: 14px 18px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.08s ease, box-shadow 0.15s ease, background 0.15s ease;
+    width: 100%;
+  }
+  .btn:active { transform: scale(0.985); }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  .btn-primary {
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(21, 101, 192, 0.28);
+  }
+  .btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+
+  .btn-outline {
+    background: #fff;
+    color: var(--primary);
+    border: 1.5px solid var(--primary);
+  }
+  .btn-outline:hover:not(:disabled) { background: #f0f6ff; }
+
+  .btn-text {
+    background: transparent;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .btn-text:hover:not(:disabled) { background: rgba(21, 101, 192, 0.06); }
+
+  .hint {
+    text-align: center;
+    font-size: 12px;
+    color: #9ca3af;
+    margin: 4px 0 0;
+  }
+
+  /* 确认弹窗 */
+  .modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(17, 24, 39, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 50;
+    animation: fadeIn 0.15s ease;
+  }
+  .modal[hidden] { display: none; }
+  .modal-box {
+    background: #fff;
+    border-radius: 18px;
+    padding: 24px 22px;
+    width: 100%;
+    max-width: 340px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+    animation: popIn 0.18s ease;
+  }
+  .modal-box h2 { margin: 0 0 10px; font-size: 19px; }
+  .modal-box p { margin: 0 0 20px; color: var(--muted); line-height: 1.6; font-size: 14px; }
+  .modal-actions { display: flex; gap: 10px; }
+  .modal-actions .btn { padding: 12px; font-size: 15px; }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes popIn { from { transform: scale(0.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 32px;
+    transform: translateX(-50%);
+    background: rgba(17, 24, 39, 0.92);
+    color: #fff;
+    padding: 11px 18px;
+    border-radius: 999px;
+    font-size: 14px;
+    max-width: 86vw;
+    text-align: center;
+    z-index: 60;
+    animation: popIn 0.18s ease;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  }
+  .toast[hidden] { display: none; }
+</style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>智能门锁</h1>
+      <span class="conn" id="connStatus"><span class="dot"></span><span id="connText">连接中…</span></span>
+    </header>
+
+    <section class="card">
+      <div class="lock-icon loading" id="lockIcon">🔒</div>
+      <div class="status-label">门状态</div>
+      <div class="status-value" id="doorStatus">加载中…</div>
+      <div class="rssi" id="rssi">WiFi 信号强度：— dBm</div>
+      <div class="updated" id="updated">—</div>
+    </section>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="btnOpen" disabled>远程开门</button>
+      <button class="btn btn-outline" id="btnClose" disabled>远程关门 / 手动锁定</button>
+      <button class="btn btn-text" id="btnNfc">NFC 开锁（预留）</button>
+    </div>
+
+    <p class="hint">OneNET 凭证请在 config.js 中填写</p>
+  </main>
+
+  <div class="modal" id="modal" hidden>
+    <div class="modal-box">
+      <h2>远程开门确认</h2>
+      <p>确定要远程打开门锁吗？开门后约 5 秒自动回锁。</p>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="modalCancel">取消</button>
+        <button class="btn btn-primary" id="modalOk">开门</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+<script>
+const CONFIG = window.SMART_LOCK_CONFIG;
+
+const el = {
+  conn: document.getElementById("connStatus"),
+  connText: document.getElementById("connText"),
+  lockIcon: document.getElementById("lockIcon"),
+  doorStatus: document.getElementById("doorStatus"),
+  rssi: document.getElementById("rssi"),
+  updated: document.getElementById("updated"),
+  btnOpen: document.getElementById("btnOpen"),
+  btnClose: document.getElementById("btnClose"),
+  btnNfc: document.getElementById("btnNfc"),
+  modal: document.getElementById("modal"),
+  modalOk: document.getElementById("modalOk"),
+  modalCancel: document.getElementById("modalCancel"),
+  toast: document.getElementById("toast")
+};
+
+let fastUntil = 0;
+let busy = false;
+let pollTimer = null;
+let toastTimer = null;
+
+// ---------- 工具 ----------
+function isSuccess(json) {
+  const code = json && json.code;
+  return code === 0 || code === "0" || code === undefined || code === null;
+}
+
+function parseBool(v) {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v !== 0;
+  return String(v).toLowerCase() === "true";
+}
+
+function parseIntOrZero(v) {
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+async function request(path, options) {
+  options = options || {};
+  const headers = Object.assign({}, options.headers, { Authorization: CONFIG.TOKEN });
+  const res = await fetch(CONFIG.BASE_URL + path, Object.assign({}, options, { headers }));
+  let json = null;
+  try { json = await res.json(); } catch (e) { /* ignore */ }
+  return { httpStatus: res.status, json };
+}
+
+// ---------- 状态渲染 ----------
+function renderStatus(isOpen, rssi) {
+  const lockIcon = el.lockIcon;
+  const doorStatus = el.doorStatus;
+
+  lockIcon.classList.remove("loading", "open", "closed");
+  lockIcon.classList.add(isOpen ? "open" : "closed");
+  lockIcon.textContent = isOpen ? "🔓" : "🔒";
+
+  doorStatus.classList.remove("open", "closed");
+  doorStatus.classList.add(isOpen ? "open" : "closed");
+  doorStatus.textContent = isOpen ? "已打开" : "已关闭";
+
+  el.rssi.textContent = "WiFi 信号强度：" + rssi + " dBm";
+  el.updated.textContent = "更新于 " + new Date().toLocaleTimeString("zh-CN", { hour12: false });
+
+  el.btnOpen.disabled = busy;
+  el.btnClose.disabled = busy;
+}
+
+function setConn(state) {
+  el.conn.classList.remove("ok", "err");
+  if (state === "ok") { el.conn.classList.add("ok"); el.connText.textContent = "已连接"; }
+  else if (state === "err") { el.conn.classList.add("err"); el.connText.textContent = "连接失败"; }
+  else { el.connText.textContent = "连接中…"; }
+}
+
+// ---------- 数据接口 ----------
+async function fetchStatus() {
+  const { httpStatus, json } = await request(
+    "/thingmodel/query-device-property?product_id=" +
+      encodeURIComponent(CONFIG.PRODUCT_ID) +
+      "&device_name=" + encodeURIComponent(CONFIG.DEVICE_NAME)
+  );
+
+  if (httpStatus >= 400 || !json || !isSuccess(json)) {
+    throw new Error("code=" + (json && json.code) + " msg=" + (json && json.msg));
+  }
+
+  const arr = Array.isArray(json.data) ? json.data : [];
+  let isOpen = false;
+  let rssi = 0;
+  for (const item of arr) {
+    if (item.identifier === "door_status") isOpen = parseBool(item.value);
+    else if (item.identifier === "wifi_rssi") rssi = parseIntOrZero(item.value);
+  }
+  return { isOpen, rssi };
+}
+
+async function callService(identifier) {
+  const { httpStatus, json } = await request("/thingmodel/call-service", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      product_id: CONFIG.PRODUCT_ID,
+      device_name: CONFIG.DEVICE_NAME,
+      identifier: identifier,
+      params: {}
+    })
+  });
+
+  if (httpStatus >= 400 || !json || !isSuccess(json)) {
+    throw new Error("code=" + (json && json.code) + " msg=" + (json && json.msg));
+  }
+}
+
+// ---------- 轮询 ----------
+function scheduleNext() {
+  clearTimeout(pollTimer);
+  const fast = Date.now() < fastUntil;
+  pollTimer = setTimeout(poll, fast ? CONFIG.FAST_POLL_MS : CONFIG.POLL_MS);
+}
+
+async function poll() {
+  try {
+    const s = await fetchStatus();
+    renderStatus(s.isOpen, s.rssi);
+    setConn("ok");
+  } catch (e) {
+    setConn("err");
+    showToast("获取状态失败：" + e.message);
+  } finally {
+    scheduleNext();
+  }
+}
+
+// ---------- 操作 ----------
+function setBusy(v) {
+  busy = v;
+  el.btnOpen.disabled = v;
+  el.btnClose.disabled = v;
+}
+
+async function doOpen() {
+  if (busy) return;
+  setBusy(true);
+  try {
+    await callService(CONFIG.SERVICE_OPEN);
+    showToast("开门指令已下发");
+    fastUntil = Date.now() + CONFIG.FAST_DURATION_MS;
+    refreshNow();
+  } catch (e) {
+    showToast("开门失败：" + e.message);
+  } finally {
+    setBusy(false);
+    scheduleNext();
+  }
+}
+
+async function doClose() {
+  if (busy) return;
+  setBusy(true);
+  try {
+    await callService(CONFIG.SERVICE_CLOSE);
+    showToast("关门指令已下发");
+    fastUntil = Date.now() + CONFIG.FAST_DURATION_MS;
+    refreshNow();
+  } catch (e) {
+    showToast("关门失败：" + e.message);
+  } finally {
+    setBusy(false);
+    scheduleNext();
+  }
+}
+
+async function refreshNow() {
+  try {
+    const s = await fetchStatus();
+    renderStatus(s.isOpen, s.rssi);
+    setConn("ok");
+  } catch (e) {
+    setConn("err");
+    showToast("获取状态失败：" + e.message);
+  }
+}
+
+// ---------- 提示 ----------
+function showToast(msg) {
+  el.toast.textContent = msg;
+  el.toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.toast.hidden = true; }, 2600);
+}
+
+function openModal() {
+  el.modal.hidden = false;
+}
+function closeModal() {
+  el.modal.hidden = true;
+}
+
+// ---------- 事件绑定 ----------
+el.btnOpen.addEventListener("click", () => { if (!busy) openModal(); });
+el.btnClose.addEventListener("click", doClose);
+el.btnNfc.addEventListener("click", () => showToast("NFC 开锁为预留功能，后续接入"));
+el.modalOk.addEventListener("click", () => { closeModal(); doOpen(); });
+el.modalCancel.addEventListener("click", closeModal);
+el.modal.addEventListener("click", (e) => { if (e.target === el.modal) closeModal(); });
+
+// ---------- 启动 ----------
+setConn("");           // 连接中
+el.btnOpen.disabled = true;
+el.btnClose.disabled = true;
+poll();
+</script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("./sw.js").catch(function () {});
+      });
+    }
+  </script>
+</body>
+</html>

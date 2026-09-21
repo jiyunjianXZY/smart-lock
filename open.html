@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#1565C0" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="开门" />
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<title>开门</title>
+<script src="config.js"></script>
+<style>
+  :root {
+    --primary: #1565C0;
+    --primary-dark: #0D47A1;
+    --ok: #43A047;
+    --err: #E53935;
+    --muted: #6b7280;
+    --bg1: #eef4fb;
+    --bg2: #f7fafd;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+    color: #1f2937;
+    background: linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 55%, #ffffff 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+  .wrap {
+    width: 100%;
+    max-width: 380px;
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 12px 30px rgba(21, 101, 192, 0.12);
+    padding: 36px 24px;
+    text-align: center;
+  }
+  .icon {
+    width: 92px;
+    height: 92px;
+    margin: 0 auto 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 46px;
+    background: rgba(21, 101, 192, 0.10);
+  }
+  h1 { margin: 0 0 8px; font-size: 24px; font-weight: 800; }
+  .sub { margin: 0 0 22px; color: var(--muted); font-size: 14px; line-height: 1.6; word-break: break-all; }
+  .btn {
+    border: none;
+    border-radius: 14px;
+    padding: 13px 20px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    color: #fff;
+    background: var(--primary);
+    width: 100%;
+    box-shadow: 0 8px 18px rgba(21, 101, 192, 0.28);
+  }
+  .btn:active { transform: scale(0.98); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="icon" id="icon">🔒</div>
+    <h1 id="title">正在开门…</h1>
+    <p class="sub" id="sub">正在下发开门指令</p>
+    <button class="btn" id="btn" hidden>再次开门</button>
+  </div>
+
+<script>
+(function () {
+  var C = window.SMART_LOCK_CONFIG;
+  var icon = document.getElementById("icon");
+  var title = document.getElementById("title");
+  var sub = document.getElementById("sub");
+  var btn = document.getElementById("btn");
+
+  function parseDoor(openValue) {
+    if (typeof openValue === "boolean") return openValue;
+    if (typeof openValue === "number") return openValue !== 0;
+    return String(openValue).toLowerCase() === "true";
+  }
+
+  async function openOnce() {
+    btn.hidden = true;
+    icon.textContent = "🔒";
+    title.textContent = "正在开门…";
+    sub.textContent = "正在下发开门指令";
+
+    try {
+      var callRes = await fetch(C.BASE_URL + "/thingmodel/call-service", {
+        method: "POST",
+        headers: {
+          "Authorization": C.TOKEN,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          product_id: C.PRODUCT_ID,
+          device_name: C.DEVICE_NAME,
+          identifier: C.SERVICE_OPEN,
+          params: {}
+        })
+      });
+      var callJson = await callRes.json();
+      var code = callJson && callJson.code;
+      var ok = code === 0 || code === "0";
+      if (!ok) {
+        throw new Error("code=" + code + " msg=" + callJson.msg);
+      }
+
+      // 开门成功后查一次门状态
+      var doorText = "";
+      try {
+        var q = await fetch(
+          C.BASE_URL + "/thingmodel/query-device-property?product_id=" +
+          encodeURIComponent(C.PRODUCT_ID) + "&device_name=" + encodeURIComponent(C.DEVICE_NAME),
+          { headers: { Authorization: C.TOKEN } }
+        );
+        var qj = await q.json();
+        var arr = Array.isArray(qj.data) ? qj.data : [];
+        for (var i = 0; i < arr.length; i++) {
+          if (arr[i].identifier === "door_status") {
+            doorText = parseDoor(arr[i].value) ? "当前状态：已打开" : "当前状态：已关闭";
+            break;
+          }
+        }
+      } catch (e) { /* 状态查询失败不影响开门结果 */ }
+
+      icon.textContent = "🔓";
+      title.textContent = "开门指令已下发";
+      sub.textContent = doorText + "（约 5 秒后自动回锁）";
+    } catch (e) {
+      icon.textContent = "⚠️";
+      title.textContent = "开门失败";
+      sub.textContent = "失败：" + e.message;
+    }
+    btn.textContent = "再次开门";
+    btn.hidden = false;
+  }
+
+  var params = new URLSearchParams(location.search);
+  var needConfirm = params.get("confirm") === "1";
+
+  btn.addEventListener("click", openOnce);
+
+  if (needConfirm) {
+    icon.textContent = "🔒";
+    title.textContent = "远程开门";
+    sub.textContent = "点击下方按钮确认开门（约 5 秒后自动回锁）";
+    btn.hidden = false;
+    btn.textContent = "开门";
+  } else {
+    openOnce();
+  }
+})();
+</script>
+</body>
+</html>
